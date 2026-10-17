@@ -1,0 +1,31 @@
+services:
+  storefront-laravel:
+    build:
+      context: ../..
+      dockerfile: shops/laravel/Dockerfile
+    profiles: [storefront]
+    environment:
+      APP_KEY: ${STOREFRONT_APP_KEY:-}
+      APP_URL: ${STOREFRONT_URL:-http://127.0.0.1:2914}
+      STOREFRONT_API_URL: ${STOREFRONT_API_URL:-http://rs-gateway:2901}
+      STOREFRONT_RESELLER_TOKEN: ${STOREFRONT_RESELLER_TOKEN:-}
+    expose:
+      - "8080"
+    volumes:
+      - storefront-laravel-cache:/var/www/app/storage/framework/cache
+    healthcheck:
+      test: [CMD, php, -r, "exit(@file_get_contents('http://127.0.0.1:8080/healthz') === false ? 1 : 0);"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+    networks:
+      rs-test:
+        ipv4_address: 172.31.0.30
+
+networks:
+  rs-test:
+    external: true
+
+volumes:
+  storefront-laravel-cache:
