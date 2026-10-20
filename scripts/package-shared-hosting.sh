@@ -21,6 +21,10 @@ if [[ ! -f "$repo_root/packages/storefront-price-widget/dist/rs-storefront-widge
     printf 'Build the shared widget first: npm run build --prefix packages/storefront-price-widget\n' >&2
     exit 1
 fi
+if [[ ! -f "$repo_root/packages/storefront-price-widget/theme/default.css" ]]; then
+    printf 'Missing widget theme: packages/storefront-price-widget/theme/default.css\n' >&2
+    exit 1
+fi
 
 mkdir -p "$temporary_app" "$temporary_repo/packages/api-client-php" "$output_dir"
 tar --exclude=.git --exclude='.env*' --exclude=vendor --exclude=storage --exclude='.phpstan*cache*' --exclude='.phpunit*cache*' --exclude='bootstrap/cache/*.php' \
@@ -34,6 +38,7 @@ mkdir -p "$temporary_app/public/assets" "$temporary_app/storage/app/private" \
     "$temporary_app/storage/framework/sessions" "$temporary_app/storage/framework/views" \
     "$temporary_app/storage/logs" "$temporary_app/bootstrap/cache"
 cp "$repo_root/packages/storefront-price-widget/dist/rs-storefront-widget.js" "$temporary_app/public/assets/rs-storefront-widget.js"
+cp "$repo_root/packages/storefront-price-widget/theme/default.css" "$temporary_app/public/assets/storefront-theme.css"
 cp -a "$temporary_app/." "$output_dir/"
 
 printf 'Created standalone shared-hosting artifact at %s\n' "$output_dir"

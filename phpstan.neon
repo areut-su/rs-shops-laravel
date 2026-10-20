@@ -5,4 +5,4 @@ parameters:
         - tests
     bootstrapFiles:
         - vendor/autoload.php
-    tmpDir: storage/framework/cache/phpstan
+    tmpDir: /tmp/rs-shops-laravel-phpstan

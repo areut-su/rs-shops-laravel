@@ -48,6 +48,8 @@ final class StorefrontApiTest extends TestCase
         $payload = $this->streamedJson($response);
         self::assertSame('0007.30', $payload['data'][0]['variants'][0]['prices'][0]['price']);
         self::assertSame('0.09', $payload['data'][100]['variants'][0]['prices'][0]['price']);
+        self::assertSame(['ipv4'], $payload['data'][0]['groups']);
+        self::assertNull($payload['data'][0]['category']['parent_slug']);
         self::assertSame('"'.str_repeat('a', 64).'"', $response->headers->get('ETag'));
         self::assertSame([['page' => 1, 'perPage' => 100], ['page' => 2, 'perPage' => 100]], $this->upstream->catalogCalls);
     }
@@ -251,6 +253,56 @@ final class StorefrontApiTest extends TestCase
         self::assertCount(2, $this->upstream->catalogCalls);
     }
 
+    public function test_missing_groups_returns_503_and_is_not_cached(): void
+    {
+        $product = $this->product(1, '10.00');
+        unset($product['groups']);
+        $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
+        $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+        $this->upstream->catalogPages[1] = $this->page(1, 1, [$this->product(1, '10.00')]);
+        $this->streamedJson($this->get('/api/storefront/v1/catalog')->assertOk());
+        self::assertCount(2, $this->upstream->catalogCalls);
+    }
+
+    public function test_malformed_group_codes_return_503(): void
+    {
+        foreach ([['IPv4'], ['1pv4'], ['a'], [str_repeat('a', 40)], ['ipv4', 'ipv4'], ['ipv4' => 'ipv4']] as $groups) {
+            $product = $this->product(1, '10.00');
+            $product['groups'] = $groups;
+            $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
+            $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+        }
+    }
+
+    public function test_missing_category_parent_slug_returns_503(): void
+    {
+        $product = $this->product(1, '10.00');
+        unset($product['category']['parent_slug']);
+        $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
+        $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+
+        $product['category']['parent_slug'] = '';
+        $this->upstream->catalogPages[1] = $this->page(1, 1, [$product]);
+        $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+    }
+
+    public function test_missing_category_parent_name_returns_503_and_null_is_allowed(): void
+    {
+        $product = $this->product(1, '10.00');
+        unset($product['category']['parent_name']);
+        $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
+        $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+
+        $product['category']['parent_name'] = '';
+        $this->upstream->catalogPages[1] = $this->page(1, 1, [$product]);
+        $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+
+        $product['category']['parent_name'] = null;
+        $this->upstream->catalogPages[1] = $this->page(1, 1, [$product]);
+        $payload = $this->streamedJson($this->get('/api/storefront/v1/catalog')->assertOk());
+        self::assertNull($payload['data'][0]['category']['parent_name']);
+    }
+
     public function test_catalog_cache_is_scoped_to_upstream_credentials(): void
     {
         $this->upstream->catalogPages = [1 => $this->page(1, 1, [$this->product(1, '10.00')])];
@@ -309,6 +361,22 @@ final class StorefrontApiTest extends TestCase
     public function test_secret_is_not_in_html(): void
     {
         $this->get('/')->assertOk()->assertDontSee('private-token')->assertSee('/api/storefront/v1', false);
+    }
+
+    public function test_storefront_page_renders_widget_variant_theme_and_theme_stylesheet(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('<link rel="stylesheet" href="/assets/storefront-theme.css">', false)
+            ->assertSee('<ps-price-widget api-base="/api/storefront/v1" locale="ru" variant="main" theme="light"></ps-price-widget>', false)
+            ->assertSee('src="/assets/rs-storefront-widget.js"', false);
+
+        $html = $response->getContent();
+        self::assertIsString($html);
+        self::assertSame(1, substr_count($html, '<ps-price-widget '));
+        self::assertStringNotContainsString('&quot;main&quot;', $html);
+        self::assertStringNotContainsString('&amp;', $html);
     }
 
     public function test_health_route_does_not_need_core_credentials_and_missing_credentials_fail_cleanly(): void
@@ -384,7 +452,7 @@ final class StorefrontApiTest extends TestCase
         return [
             'public_id' => sprintf('00000000-0000-4000-8000-%012d', $id),
             'slug' => 'product-'.$id,
-            'category' => ['slug' => 'proxy', 'name' => 'Proxy'],
+            'category' => ['slug' => 'proxy', 'name' => 'Proxy', 'parent_slug' => null, 'parent_name' => null],
             'translations' => [['locale' => 'en', 'title' => 'Product', 'description' => null]],
             'proxy_profile' => ['ip_type' => 1, 'proxy_type' => 1, 'proxy_access_type' => 'private', 'country_code' => null, 'min_quantity' => 1, 'multiple_quantity' => 1],
             'variants' => [[
@@ -392,6 +460,7 @@ final class StorefrontApiTest extends TestCase
                 'quantity_unit' => 1, 'is_default' => true,
                 'prices' => [['currency' => 'USD', 'price' => $price, 'min_quantity' => null]],
             ]],
+            'groups' => ['ipv4'],
         ];
     }
 

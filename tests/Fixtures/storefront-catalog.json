@@ -1,11 +1,12 @@
 {
   "data": [{
     "public_id": "019a0000-0000-7000-8000-000000000001", "slug": "server-de",
-    "category": {"slug": "server", "name": "Server proxies"},
+    "category": {"slug": "server", "name": "Server proxies", "parent_slug": null, "parent_name": null},
     "translations": [{"locale": "en", "title": "Germany proxies", "description": null}, {"locale": "ru", "title": "Прокси Германии", "description": null}],
     "proxy_profile": {"ip_type": 1, "proxy_type": 1, "proxy_access_type": "private", "country_code": "DE", "min_quantity": 1, "multiple_quantity": 1},
     "variants": [{"public_id": "019a0000-0000-7000-8000-000000000002", "code": "server-de-30", "period_days": 30, "traffic_mb": null, "quantity_unit": 1, "is_default": true,
-      "prices": [{"currency": "USD", "price": "10.00", "min_quantity": null}, {"currency": "USD", "price": "8.50", "min_quantity": 10}, {"currency": "EUR", "price": "9.00", "min_quantity": null}]}]
+      "prices": [{"currency": "USD", "price": "10.00", "min_quantity": null}, {"currency": "USD", "price": "8.50", "min_quantity": 10}, {"currency": "EUR", "price": "9.00", "min_quantity": null}]}],
+    "groups": ["ipv4"]
   }],
   "links": [{"url": null,"label":"Previous","page":null,"active":false},{"url":"https://api.example.test/api/v1/satellite/storefront/catalog?page=1","label":"1","page":1,"active":true},{"url":null,"label":"Next","page":null,"active":false}],
   "meta": {"current_page":1,"from":1,"last_page":1,"path":"https://api.example.test/api/v1/satellite/storefront/catalog","per_page":100,"to":1,"total":1,"first_page_url":"https://api.example.test/api/v1/satellite/storefront/catalog?page=1","last_page_url":"https://api.example.test/api/v1/satellite/storefront/catalog?page=1","next_page_url":null,"prev_page_url":null}

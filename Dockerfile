@@ -30,6 +30,7 @@ COPY shops/laravel/resources/ ./resources/
 COPY shops/laravel/routes/ ./routes/
 COPY --from=php-dependencies /var/www/shops/laravel/vendor ./vendor
 COPY --from=widget-build /repo/packages/storefront-price-widget/dist/rs-storefront-widget.js ./public/assets/rs-storefront-widget.js
+COPY --from=widget-build /repo/packages/storefront-price-widget/theme/default.css ./public/assets/storefront-theme.css
 RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 ENV APP_ENV=production APP_DEBUG=false CACHE_STORE=file SESSION_DRIVER=file QUEUE_CONNECTION=sync

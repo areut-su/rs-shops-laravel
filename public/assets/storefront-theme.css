@@ -1,0 +1,28 @@
+/*
+ * Example storefront theme for <ps-price-widget>.
+ *
+ * The widget renders into a Shadow DOM. Page-level class selectors cannot
+ * reach its internal nodes, so override the public CSS custom properties and
+ * use ::part(...) selectors for point fixes.
+ *
+ * In production this file is replaced by
+ * packages/storefront-price-widget/theme/default.css during the Docker build
+ * and by scripts/package-shared-hosting.sh for shared hosting. Edit that
+ * source file to change the packaged palette.
+ */
+ps-price-widget {
+  --psw-accent: #5f4bd8;
+  --psw-accent-contrast: #fff;
+  --psw-radius: 16px;
+  --psw-radius-control: 10px;
+}
+
+ps-price-widget::part(tab-active) {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent);
+  color: var(--psw-accent-contrast);
+}
+
+ps-price-widget::part(buy-button) {
+  border-radius: 999px;
+}

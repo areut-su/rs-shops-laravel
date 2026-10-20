@@ -58,7 +58,7 @@ $upstream = new class($productTotal, $lastPage, $path) implements StorefrontUpst
             $products[] = [
                 'public_id' => sprintf('00000000-0000-4000-8000-%012d', $productId),
                 'slug' => 'product-'.$productId,
-                'category' => ['slug' => 'proxy', 'name' => 'Proxy'],
+                'category' => ['slug' => 'proxy', 'name' => 'Proxy', 'parent_slug' => null, 'parent_name' => null],
                 'translations' => [['locale' => 'en', 'title' => 'Product '.$productId, 'description' => null]],
                 'proxy_profile' => [
                     'ip_type' => 1,
@@ -69,6 +69,7 @@ $upstream = new class($productTotal, $lastPage, $path) implements StorefrontUpst
                     'multiple_quantity' => 1,
                 ],
                 'variants' => $variants,
+                'groups' => ['ipv4'],
             ];
         }
 

@@ -358,21 +358,25 @@ final class StorefrontCatalog
             || ! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $product['public_id'])
             || ! is_string($product['slug'] ?? null)
             || $product['slug'] === ''
-            || ! $this->hasExactKeys($product, ['public_id', 'slug', 'category', 'translations', 'proxy_profile', 'variants'])
+            || ! $this->hasExactKeys($product, ['public_id', 'slug', 'category', 'translations', 'proxy_profile', 'variants', 'groups'])
             || ! is_array($product['category'] ?? null)
             || ! is_array($product['translations'] ?? null)
             || ! array_is_list($product['translations'])
             || ! is_array($product['proxy_profile'] ?? null)
             || ! is_array($product['variants'] ?? null)
-            || ! array_is_list($product['variants'])) {
+            || ! array_is_list($product['variants'])
+            || ! is_array($product['groups'] ?? null)
+            || ! array_is_list($product['groups'])) {
             throw new StorefrontUnavailable('The upstream returned an invalid catalog item.');
         }
 
         $category = $product['category'];
         $profile = $product['proxy_profile'];
-        if (! $this->hasExactKeys($category, ['slug', 'name'])
+        if (! $this->hasExactKeys($category, ['slug', 'name', 'parent_slug', 'parent_name'])
             || ! is_string($category['slug'] ?? null) || $category['slug'] === ''
             || ! is_string($category['name'] ?? null) || $category['name'] === ''
+            || ! $this->nullableNonEmptyString($category['parent_slug'] ?? null)
+            || ! $this->nullableNonEmptyString($category['parent_name'] ?? null)
             || ! $this->hasExactKeys($profile, ['ip_type', 'proxy_type', 'proxy_access_type', 'country_code', 'min_quantity', 'multiple_quantity'])
             || ! in_array($profile['ip_type'] ?? null, [1, 2], true)
             || ! in_array($profile['proxy_type'] ?? null, [1, 2, 3, 4], true)
@@ -382,7 +386,8 @@ final class StorefrontCatalog
             || ! ($profile['country_code'] === null || is_string($profile['country_code']) && preg_match('/^[A-Z]{2}$/', $profile['country_code']) === 1)
             || ! $this->positiveInt($profile['min_quantity'] ?? null)
             || ! $this->positiveInt($profile['multiple_quantity'] ?? null)
-            || $product['variants'] === []) {
+            || $product['variants'] === []
+            || ! $this->validGroupCodes($product['groups'])) {
             throw new StorefrontUnavailable('The upstream returned an invalid catalog item.');
         }
 
@@ -519,6 +524,18 @@ final class StorefrontCatalog
     private function nullableNonEmptyString(mixed $value): bool
     {
         return $value === null || is_string($value) && $value !== '';
+    }
+
+    /** @param list<mixed> $groups */
+    private function validGroupCodes(array $groups): bool
+    {
+        foreach ($groups as $group) {
+            if (! is_string($group) || preg_match('/^[a-z][a-z0-9_-]{1,31}$/', $group) !== 1) {
+                return false;
+            }
+        }
+
+        return count($groups) === count(array_unique($groups));
     }
 
     private function positiveInt(mixed $value): bool

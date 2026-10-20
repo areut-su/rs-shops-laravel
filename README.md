@@ -53,7 +53,11 @@ exercise 7,446 products and 37,692 variants in a subprocess limited to 128 MB.
 Use PHP 8.4 with `curl`, `json`, and `mbstring`; configure the web server
 document root as `public/`. Build the shared widget in the RS checkout with
 `npm run build --prefix packages/storefront-price-widget`, then place its
-`dist/rs-storefront-widget.js` at `public/assets/rs-storefront-widget.js`.
+`dist/rs-storefront-widget.js` at `public/assets/rs-storefront-widget.js` and
+`theme/default.css` at `public/assets/storefront-theme.css`. The widget page
+links that stylesheet; override the `--psw-*` custom properties or use
+`::part(...)` selectors there to change the palette without rebuilding the
+bundle.
 Build the widget, then run
 `shops/laravel/scripts/package-shared-hosting.sh [output-directory]` from the RS
 checkout. The script assembles the application, widget asset, and PHP
