@@ -65,6 +65,8 @@ $upstream = new class($productTotal, $lastPage, $path) implements StorefrontUpst
                     'proxy_type' => 1,
                     'proxy_access_type' => 'private',
                     'country_code' => null,
+                    'traffic_mb' => null,
+                    'countries' => [],
                     'min_quantity' => 1,
                     'multiple_quantity' => 1,
                 ],

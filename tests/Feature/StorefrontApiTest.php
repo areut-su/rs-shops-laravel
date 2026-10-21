@@ -253,6 +253,67 @@ final class StorefrontApiTest extends TestCase
         self::assertCount(2, $this->upstream->catalogCalls);
     }
 
+    public function test_payg_period_zero_is_accepted_and_negative_period_is_rejected(): void
+    {
+        $product = $this->product(1, '10.00');
+        $product['variants'][0]['period_days'] = -1;
+        $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
+        $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+
+        $product['variants'][0]['period_days'] = 0;
+        $this->upstream->catalogPages[1] = $this->page(1, 1, [$product]);
+        $payload = $this->streamedJson($this->get('/api/storefront/v1/catalog')->assertOk());
+        self::assertSame(0, $payload['data'][0]['variants'][0]['period_days']);
+        self::assertCount(2, $this->upstream->catalogCalls);
+    }
+
+    public function test_traffic_package_product_with_country_coverage_and_all_periods_is_preserved(): void
+    {
+        $product = $this->product(1, '10.00');
+        $product['slug'] = 'residential-1gb';
+        $product['proxy_profile']['traffic_mb'] = 1024;
+        $product['proxy_profile']['countries'] = ['DE', 'US'];
+        $product['variants'] = array_map(
+            static fn (int $period): array => [
+                'public_id' => null,
+                'code' => 'residential-1gb-'.$period,
+                'period_days' => $period,
+                'traffic_mb' => 1024,
+                'quantity_unit' => 1,
+                'is_default' => $period === 30,
+                'prices' => [['currency' => 'USD', 'price' => '10.00', 'min_quantity' => null]],
+            ],
+            [0, 30, 365],
+        );
+        $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
+
+        $payload = $this->streamedJson($this->get('/api/storefront/v1/catalog')->assertOk());
+
+        self::assertSame(1024, $payload['data'][0]['proxy_profile']['traffic_mb']);
+        self::assertSame(['DE', 'US'], $payload['data'][0]['proxy_profile']['countries']);
+        self::assertSame([0, 30, 365], array_column($payload['data'][0]['variants'], 'period_days'));
+    }
+
+    public function test_invalid_package_traffic_and_countries_are_rejected(): void
+    {
+        foreach ([
+            ['traffic_mb' => 0, 'countries' => ['DE']],
+            ['traffic_mb' => 1024, 'countries' => ['de']],
+            ['traffic_mb' => 1024, 'countries' => ['DE', 'DE']],
+            ['traffic_mb' => null, 'countries' => ['DEU']],
+        ] as $profileOverrides) {
+            $product = $this->product(1, '10.00');
+            $product['proxy_profile'] = array_replace($product['proxy_profile'], $profileOverrides);
+            $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
+            $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
+        }
+
+        $product = $this->product(1, '10.00');
+        $product['proxy_profile'] = array_replace($product['proxy_profile'], ['traffic_mb' => null, 'countries' => []]);
+        $this->upstream->catalogPages[1] = $this->page(1, 1, [$product]);
+        $this->streamedJson($this->get('/api/storefront/v1/catalog')->assertOk());
+    }
+
     public function test_missing_groups_returns_503_and_is_not_cached(): void
     {
         $product = $this->product(1, '10.00');
@@ -272,6 +333,38 @@ final class StorefrontApiTest extends TestCase
             $this->upstream->catalogPages = [1 => $this->page(1, 1, [$product])];
             $this->getJson('/api/storefront/v1/catalog')->assertStatus(503);
         }
+    }
+
+    public function test_isp_group_product_with_category_tree_passes_validation_and_preserves_it(): void
+    {
+        $this->upstream->catalogPages = [1 => $this->fixturePage()];
+
+        $payload = $this->streamedJson($this->get('/api/storefront/v1/catalog')->assertOk());
+        self::assertIsArray($payload['data']);
+        self::assertCount(2, $payload['data']);
+
+        $ispProduct = $payload['data'][1];
+        self::assertIsArray($ispProduct);
+        self::assertSame('isp-de', $ispProduct['slug']);
+        self::assertSame(['isp'], $ispProduct['groups']);
+
+        $proxyProfile = $ispProduct['proxy_profile'];
+        self::assertIsArray($proxyProfile);
+        self::assertSame(4, $proxyProfile['proxy_type']);
+
+        $category = $ispProduct['category'];
+        self::assertIsArray($category);
+        self::assertSame('isp-de', $category['slug'], 'A child website keeps its own slug.');
+        self::assertSame('ISP Germany', $category['name']);
+        self::assertSame('isp', $category['parent_slug'], 'A child website keeps its root category slug.');
+        self::assertSame('ISP proxies', $category['parent_name']);
+
+        $translations = $ispProduct['translations'];
+        self::assertIsArray($translations);
+        self::assertSame(
+            [['locale' => 'en', 'title' => 'ISP Germany', 'description' => null], ['locale' => 'ru', 'title' => 'ISP Германия', 'description' => null]],
+            $translations,
+        );
     }
 
     public function test_missing_category_parent_slug_returns_503(): void
@@ -399,6 +492,17 @@ final class StorefrontApiTest extends TestCase
         return $payload;
     }
 
+    /** @return array<string, mixed> */
+    private function fixturePage(): array
+    {
+        $contents = file_get_contents(__DIR__.'/../Fixtures/storefront-catalog.json');
+        self::assertIsString($contents);
+        $page = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($page);
+
+        return $page;
+    }
+
     /**
      * @param list<array<string, mixed>> $data
      * @return array{
@@ -454,7 +558,7 @@ final class StorefrontApiTest extends TestCase
             'slug' => 'product-'.$id,
             'category' => ['slug' => 'proxy', 'name' => 'Proxy', 'parent_slug' => null, 'parent_name' => null],
             'translations' => [['locale' => 'en', 'title' => 'Product', 'description' => null]],
-            'proxy_profile' => ['ip_type' => 1, 'proxy_type' => 1, 'proxy_access_type' => 'private', 'country_code' => null, 'min_quantity' => 1, 'multiple_quantity' => 1],
+            'proxy_profile' => ['ip_type' => 1, 'proxy_type' => 1, 'proxy_access_type' => 'private', 'country_code' => null, 'traffic_mb' => null, 'countries' => [], 'min_quantity' => 1, 'multiple_quantity' => 1],
             'variants' => [[
                 'public_id' => null, 'code' => null, 'period_days' => 30, 'traffic_mb' => null,
                 'quantity_unit' => 1, 'is_default' => true,

@@ -377,13 +377,16 @@ final class StorefrontCatalog
             || ! is_string($category['name'] ?? null) || $category['name'] === ''
             || ! $this->nullableNonEmptyString($category['parent_slug'] ?? null)
             || ! $this->nullableNonEmptyString($category['parent_name'] ?? null)
-            || ! $this->hasExactKeys($profile, ['ip_type', 'proxy_type', 'proxy_access_type', 'country_code', 'min_quantity', 'multiple_quantity'])
+            || ! $this->hasExactKeys($profile, ['ip_type', 'proxy_type', 'proxy_access_type', 'country_code', 'traffic_mb', 'countries', 'min_quantity', 'multiple_quantity'])
             || ! in_array($profile['ip_type'] ?? null, [1, 2], true)
             || ! in_array($profile['proxy_type'] ?? null, [1, 2, 3, 4], true)
             || ! array_key_exists('proxy_access_type', $profile)
             || ! in_array($profile['proxy_access_type'], ['private', 'shared', null], true)
             || ! array_key_exists('country_code', $profile)
             || ! ($profile['country_code'] === null || is_string($profile['country_code']) && preg_match('/^[A-Z]{2}$/', $profile['country_code']) === 1)
+            || ! array_key_exists('traffic_mb', $profile)
+            || ! ($profile['traffic_mb'] === null || $this->positiveInt($profile['traffic_mb']))
+            || ! $this->validCountryCodes($profile['countries'] ?? null)
             || ! $this->positiveInt($profile['min_quantity'] ?? null)
             || ! $this->positiveInt($profile['multiple_quantity'] ?? null)
             || $product['variants'] === []
@@ -409,7 +412,7 @@ final class StorefrontCatalog
                 || ! ($variant['public_id'] === null || is_string($variant['public_id']) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $variant['public_id']) === 1)
                 || ! array_key_exists('code', $variant)
                 || ! (is_string($variant['code']) || $variant['code'] === null)
-                || ! $this->positiveInt($variant['period_days'] ?? null)
+                || ! $this->nonNegativeInt($variant['period_days'] ?? null)
                 || ! $this->positiveInt($variant['quantity_unit'] ?? null)
                 || ! array_key_exists('traffic_mb', $variant)
                 || ! (is_int($variant['traffic_mb']) && $variant['traffic_mb'] > 0 || $variant['traffic_mb'] === null)
@@ -526,6 +529,23 @@ final class StorefrontCatalog
         return $value === null || is_string($value) && $value !== '';
     }
 
+    private function validCountryCodes(mixed $countries): bool
+    {
+        if (! is_array($countries) || ! array_is_list($countries)) {
+            return false;
+        }
+
+        $seen = [];
+        foreach ($countries as $country) {
+            if (! is_string($country) || preg_match('/^[A-Z]{2}$/', $country) !== 1 || isset($seen[$country])) {
+                return false;
+            }
+            $seen[$country] = true;
+        }
+
+        return true;
+    }
+
     /** @param list<mixed> $groups */
     private function validGroupCodes(array $groups): bool
     {
@@ -541,6 +561,11 @@ final class StorefrontCatalog
     private function positiveInt(mixed $value): bool
     {
         return is_int($value) && $value > 0;
+    }
+
+    private function nonNegativeInt(mixed $value): bool
+    {
+        return is_int($value) && $value >= 0;
     }
 
     /**
